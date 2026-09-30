@@ -1,0 +1,149 @@
+#include "tlpp-core.th"
+#Include 'Protheus.ch'
+
+Class TransportadoraRepository
+    Public Data nPage     as Numeric
+    Public Data nPageSize as Numeric
+
+    Public Method New() constructor
+    Public Method GetAll()
+    Public Method GetId()
+
+EndClass
+
+Method New() Class TransportadoraRepository
+    ::nPage     := 0
+    ::nPageSize := 0
+Return Self
+
+Method GetAll() Class TransportadoraRepository
+
+    Local jResponse   := JsonObject():New()
+    Local cAlias      := GetNextAlias()
+
+    Local aData       := {}     as Array
+
+    Local nOffSet     := 0      as Numeric
+    Local nTotal      := 0      as Numeric
+    Local nTotalPages := 0      as Numeric
+
+    Local cQuery      := ""     as Character
+    Local jItem       := Nil    as Object
+
+
+    nOffset := (::nPage - 1) * ::nPageSize
+
+    cQuery := " SELECT COUNT(*) AS TOTAL "
+    cQuery += " FROM " + RetSqlName("SA4") + " SA4 "
+    cQuery += " WHERE SA4.D_E_L_E_T_ = ' ' "
+
+    cQuery := ChangeQuery(cQuery)
+    dbUseArea( .T., "TOPCONN", TCGenQry(,,cQuery), "cAlias", .T., .T. )
+
+    If !cAlias->(Eof())
+
+        nTotal := cAlias->TOTAL
+
+    EndIf
+
+    cAlias->(DbCloseArea())
+
+    If nTotal > 0
+
+        nTotalPages := Int((nTotal + ::nPageSize - 1) / ::nPageSize)
+
+    Else
+
+        nTotalPages := 0
+
+    EndIf
+
+    cAlias := GetNextAlias()
+
+    cQuery := " SELECT "
+    cQuery += "     A4_COD, "
+    cQuery += "     A4_NOME, "
+    cQuery += "     A4_EMAIL, "
+    cQuery += "     A4_HPAGE, "
+    cQuery += "     A4_CONTATO "
+
+    cQuery += " FROM " + RetSqlName("SA4") + " SA4 "
+
+    cQuery += " WHERE SA4.D_E_L_E_T_ = ' ' "
+
+    cQuery += " ORDER BY A4_COD "
+
+    cQuery += " OFFSET " + AllTrim(Str(nOffset))
+    cQuery += " ROWS FETCH NEXT "
+    cQuery += AllTrim(Str(::nPageSize))
+    cQuery += " ROWS ONLY "
+
+    cQuery := ChangeQuery(cQuery)
+    dbUseArea( .T., "TOPCONN", TCGenQry(,,cQuery), "cAlias", .T., .T. )
+
+    cAlias->(DbGoTop())
+
+    While !cAlias->(EoF())
+        jItem := JsonObject():New()
+
+        jItem["codigo"]  := AllTrim(cAlias->A4_COD)
+        jItem["nome"]    := AllTrim(cAlias->A4_NOME)
+        jItem["email"]   := AllTrim(cAlias->A4_EMAIL)
+        jItem["hpage"]   := AllTrim(cAlias->A4_HPAGE)
+        jItem["contato"] := AllTrim(cAlias->A4_CONTATO)
+
+        AAdd(aData, jItem) 
+
+        cAlias->(DbSkip())
+    EndDo
+
+    cAlias->(DbCloseArea())
+
+    If Len(aData) > 0 
+        jResponse["success"]                    := .T.
+        jResponse["data"]                       := aData
+
+        jResponse["pagination"]                 := JsonObject():New()
+
+        jResponse["pagination"]["page"]         := ::nPage
+        jResponse["pagination"]["pageSize"]     := ::nPageSize
+        jResponse["pagination"]["total"]        := nTotal
+        jResponse["pagination"]["totalPages"]   := nTotalPages
+    else
+        jResponse["success"]                    := .F.
+        jResponse["data"]                       := aData
+        jResponse["message"]                    := "Nao foram encontrado dados para retorno"
+    EndIf
+
+Return jResponse
+
+Method GetId(cId) Class TransportadoraRepository
+    Local cAliasWS    := "SA4"              as Character
+    Local jResponse   := JsonObject():New() as Object
+    Local jItem       := JsonObject():New() as Object
+
+    Local aData       := {}                 as Array
+    
+    DbSelectArea(cAliasWS)
+    (cAliasWS)->(DbSetOrder(1))
+
+    //Se não encontrar o registro
+    If !(cAliasWS)->(DbSeek(FWxFilial(cAliasWS) + PadR( AllTrim(cId), TamSx3("A4_COD")[1] )))
+        jResponse['success']    := .F.
+        jResponse['data']       := aData
+        jResponse['message']    := 'ID nao encontrado'
+    Else
+
+        jItem["codigo"]         := AllTrim((cAliasWS)->A4_COD)
+        jItem["nome"]           := AllTrim((cAliasWS)->A4_NOME)
+        jItem["email"]          := AllTrim((cAliasWS)->A4_EMAIL)
+        jItem["hpage"]          := AllTrim((cAliasWS)->A4_HPAGE)
+        jItem["contato"]        := AllTrim((cAliasWS)->A4_CONTATO)
+
+        AAdd(aData, jItem)
+
+        jResponse['success']    := .T.
+        jResponse['data']       := aData 
+    EndIf
+
+Return jResponse

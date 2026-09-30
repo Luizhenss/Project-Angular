@@ -1,0 +1,136 @@
+#include "tlpp-core.th"
+#Include 'Protheus.ch'
+
+Class TransportadoraController
+    Public Data oService as Object
+
+    Public method New() constructor
+
+    @get(endpoint='/api/v1/WStransportadoras/get_all', description='Serviço rest de retorno de todas as transportadors - metodo get')
+    Public method GetAll()
+
+    @get(endpoint='/api/v1/WStransportadoras/get_id/:id', description='Serviço rest de retorno de transportadors por ID - metodo get')
+    Public method GetID()
+EndClass
+
+Method New() Class TransportadoraController
+    ::oService := TransportadoraService():New()
+Return self
+
+Method GetAll() Class TransportadoraController
+    
+    Local nPage         := 1        as Numeric
+    Local nPageSize     := 20       as Numeric
+
+    Local jResponse                 as Object
+
+    Private jQuery      := oRest:getQueryRequest()
+
+    If ValType(jQuery) <> 'U'
+        If ValType(jQuery["page"]) <> "U"
+            nPage := Val(jQuery["page"])
+        EndIf
+
+        If ValType(jQuery["pageSize"]) <> "U"
+            nPageSize := Val(jQuery["pageSize"])
+        EndIf    
+    EndIf
+
+    If nPage < 1
+        oRest:setStatusCode(400)
+
+        jResponse := JsonObject():New()
+
+        jResponse["success"] := .F.
+        jResponse["message"] := "O parametro 'page' deve ser maior que zero."
+
+        oRest:setFault(jResponse)
+
+        Return Nil
+    EndIf
+
+    If nPageSize < 1 .Or. nPageSize > 100
+
+        oRest:setStatusCode(400)
+
+        jResponse := JsonObject():New()
+
+        jResponse["success"] := .F.
+        jResponse["message"] := "O parametro pageSize deve estar entre 1 e 100."
+
+        oRest:setFault(jResponse)
+
+        Return Nil
+
+    EndIf
+
+    // Service
+    ::oService           := TransportadoraService():New()
+    ::oService:nPage     := nPage
+    ::oService:nPageSize := nPageSize
+
+    jResponse := ::oService:GetAll()
+
+    //Response
+
+    If jResponse['success']
+        oRest:setStatusCode(200)
+    else
+        oRest:setStatusCode(400)
+    EndIf
+
+    oRest:setKeyHeaderResponse('Content-Type','application/json')
+    oRest:SetResponse(EncodeUTF8(jResponse:toJSON()))
+Return .T.
+
+Method GetID() Class TransportadoraController
+    Local jResponse                 as Object
+
+    Private jPath      := oRest:GetPathParamsRequest()
+
+    If ValType(jPath) <> 'U'
+        If ValType(jPath["id"]) <> "U"
+            cId := jPath["id"]
+        EndIf 
+    EndIf
+
+    If Empty(cId)
+        oRest:setStatusCode(400)
+
+        jResponse := JsonObject():New()
+
+        jResponse["success"] := .F.
+        jResponse["message"] := "Nao foi informado o ID da consulta."
+
+        oRest:setFault(jResponse)
+
+        Return Nil
+    EndIf
+
+    If Len(cId) > TamSX3('A4_COD')[1]
+        oRest:setStatusCode(400)
+
+        jResponse := JsonObject():New()
+
+        jResponse["success"] := .F.
+        jResponse["message"] := "Tamanho do ID maior que o cadastro do protheus, insira um ID valido"
+
+        oRest:setFault(jResponse)
+
+        Return Nil
+    EndIf
+    // Service
+    
+    jResponse := ::oService:GetId(cId)
+
+    //Response
+
+    If jResponse['success']
+        oRest:setStatusCode(200)
+    else
+        oRest:setStatusCode(400)
+    EndIf
+
+    oRest:setKeyHeaderResponse('Content-Type','application/json')
+    oRest:SetResponse(EncodeUTF8(jResponse:toJSON()))
+Return .T.

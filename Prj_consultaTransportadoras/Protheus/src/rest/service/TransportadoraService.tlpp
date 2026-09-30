@@ -1,0 +1,54 @@
+#include "tlpp-core.th"
+#Include 'Protheus.ch'
+
+Class TransportadoraService
+    Public Data nPage       as Numeric
+    Public Data nPageSize   as Numeric
+    Public Data oRepository as Object
+
+    Public Method New() constructor
+    Public Method GetAll()
+    Public Method GetId()
+
+EndClass
+
+Method New() Class TransportadoraService
+    ::nPage       := 0
+    ::nPageSize   := 0
+    ::oRepository := TransportadoraRepository():New()
+Return Self
+
+Method GetAll() Class TransportadoraService
+
+    Local jResult := Nil as Object
+
+    If ::nPage <= 0
+        ::nPage := 1
+    EndIf
+
+    If ::nPageSize <= 0
+        ::nPageSize := 20
+    EndIf
+
+    /*
+        Segurança contra consultas gigantes.
+    */
+
+    If ::nPageSize > 100
+        ::nPageSize := 100
+    EndIf
+
+    ::oRepository:nPage     := ::nPage
+    ::oRepository:nPageSize := ::nPageSize
+
+    jResult := ::oRepository:GetAll()
+
+Return jResult
+
+Method GetId(cId) Class TransportadoraService
+
+    Local jResult := Nil as Object
+
+    jResult := ::oRepository:GetId(cId)
+
+Return jResult
